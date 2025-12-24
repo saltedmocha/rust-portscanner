@@ -1,8 +1,7 @@
-pub enum PortState {
-    Open,
-    Closed,
-    Filtered,
-}
-
 pub mod arg;
-pub mod net;
+pub mod full;
+pub mod network;
+pub mod ping;
+pub mod quick;
+pub mod stealth;
+pub mod udp;

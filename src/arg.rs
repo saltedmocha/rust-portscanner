@@ -1,68 +1,98 @@
+use std::{net, process};
+
 use clap::{Parser, Subcommand};
-use std::{net, process::exit};
+
+pub enum AddressMode {
+    V4,
+    V6,
+}
+
+#[derive(Parser, Debug)]
+pub struct Arg {
+    #[arg(short = '4', long)]
+    /// Use IPv4
+    v4: bool,
+    #[arg(short = '6', long)]
+    /// Use IPv6
+    v6: bool,
+    #[arg(short, long)]
+    /// Check for specific port
+    port: Option<u16>,
+    #[arg(short, long)]
+    /// Set time until timeout
+    timeout: Option<u16>,
+
+    /// Target or destination IP address, accept IPv4 or IPv6 unless specified
+    target: String,
+}
 
 #[derive(Debug, Subcommand)]
-enum Commands {
-    #[command(arg_required_else_help = true)]
-    /// Use ping scanning method
-    Ping,
-    #[command(arg_required_else_help = true)]
-    /// Use TCP Half Open method
-    Quick,
+pub enum Commands {
     #[command(arg_required_else_help = true)]
     /// Use TCP Connect method
-    Full,
+    Full(Arg),
     #[command(arg_required_else_help = true)]
-    /// Use udp method, best for target such as dns req
-    Udp,
+    /// Use Null packet method
+    Null(Arg),
     #[command(arg_required_else_help = true)]
-    /// Use XMAS scan / NULL packet method
-    Stealth,
+    /// Use TCP Half Open method
+    Quick(Arg),
+    #[command(arg_required_else_help = true)]
+    /// Use ping scanning method
+    Ping(Arg),
+    #[command(arg_required_else_help = true)]
+    /// Use udp scan method
+    Udp(Arg),
+    #[command(arg_required_else_help = true)]
+    /// Use xmas scan method
+    Xmas(Arg),
 }
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct GlobalArg {
-    #[arg(short = '4', long)]
-    /// Use IPv4 [default]
-    v4: bool,
-    #[arg(short = '6', long)]
-    /// Use IPv6
-    v6: bool,
-    #[arg(short, long, default_value = "127.0.0.1")]
-    /// Default to scan user machine instead
-    target: String,
-
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
-impl GlobalArg {
-    pub fn parse_ip(self) -> net::IpAddr {
+impl Arg {
+    pub fn mode(&self) -> AddressMode {
         if self.v6 {
-            let address: net::Ipv6Addr = match self.target.parse::<net::Ipv6Addr>() {
-                Ok(ip) => ip,
-                Err(err) => {
-                    println!(
-                        "Failed to parse IP address, please enter a valid address\nerr: {}",
-                        err
-                    );
-                    exit(1);
-                }
-            };
-            return net::IpAddr::V6(address);
+            return AddressMode::V6;
         }
 
-        let address: net::Ipv4Addr = match self.target.parse::<net::Ipv4Addr>() {
-            Ok(ip) => ip,
-            Err(err) => {
-                println!(
-                    "Failed to parse IP address, please enter a valid address\nerr: {}",
-                    err
-                );
-                exit(1);
+        AddressMode::V4
+    }
+
+    pub fn port(&self) -> &Option<u16> {
+        &self.port
+    }
+
+    pub fn parse_ip(&self) -> net::IpAddr {
+        if self.v6 {
+            let address: Result<net::Ipv6Addr, net::AddrParseError> =
+                self.target.parse::<net::Ipv6Addr>();
+            match address {
+                Ok(ip) => return net::IpAddr::V6(ip),
+                Err(_) => {
+                    println!("Invalid IPv6 address, please makesure address fit the IPv6 format");
+                    process::exit(1);
+                }
             }
-        };
-        net::IpAddr::V4(address)
+        }
+
+        let address: Result<net::Ipv4Addr, net::AddrParseError> =
+            self.target.parse::<net::Ipv4Addr>();
+        match address {
+            Ok(ip) => net::IpAddr::V4(ip),
+            Err(_) => {
+                println!("Invalid IPv4 address, plelase makesure address fit the IPv4 format");
+                process::exit(1);
+            }
+        }
+    }
+
+    pub fn timeout(&self) -> &Option<u16> {
+        &self.timeout
     }
 }
